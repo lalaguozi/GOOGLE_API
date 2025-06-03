@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Q&A Assistant</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        position: relative;
+        overflow-x: hidden;
+    }
+
+    /* 背景动画装饰 */
+    body::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.05)"/><circle cx="20" cy="20" r="0.5" fill="rgba(255,255,255,0.03)"/><circle cx="80" cy="30" r="0.8" fill="rgba(255,255,255,0.04)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+        pointer-events: none;
+    }
+
+    .container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        padding: 40px;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1), 
+                    0 0 0 1px rgba(255, 255, 255, 0.2);
+        width: 100%;
+        max-width: 700px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        animation: fadeInUp 0.8s ease-out;
+    }
+
+    .container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #667eea, transparent);
+        animation: shimmer 2s infinite;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes shimmer {
+        to {
+            left: 100%;
+        }
+    }
+
+    h1 {
+        color: #2d3748;
+        margin-bottom: 30px;
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        position: relative;
+    }
+
+    .input-container {
+        position: relative;
+        margin-bottom: 30px;
+        display: flex;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    #questionInput {
+        flex: 1;
+        padding: 18px 20px;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        background: rgba(255, 255, 255, 0.8);
+        transition: all 0.3s ease;
+        outline: none;
+        backdrop-filter: blur(10px);
+    }
+
+    #questionInput:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        background: rgba(255, 255, 255, 1);
+        transform: translateY(-1px);
+    }
+
+    #questionInput::placeholder {
+        color: #a0aec0;
+    }
+
+    #askButton {
+        padding: 18px 30px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 1.1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        min-width: 120px;
+    }
+
+    #askButton::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    #askButton:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    #askButton:hover::before {
+        left: 100%;
+    }
+
+    #askButton:active {
+        transform: translateY(0);
+    }
+
+    #askButton:disabled {
+        background: #a0aec0;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .response-container {
+        position: relative;
+    }
+
+    .chat-container {
+        margin-bottom: 20px;
+    }
+
+    .chat-history {
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 20px;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        background: rgba(248, 250, 252, 0.8);
+        backdrop-filter: blur(10px);
+        margin-bottom: 15px;
+    }
+
+    .chat-message {
+        display: flex;
+        margin-bottom: 20px;
+        animation: fadeInMessage 0.5s ease-out;
+    }
+
+    .chat-message.user {
+        justify-content: flex-end;
+    }
+
+    .chat-message.bot {
+        justify-content: flex-start;
+    }
+
+    .avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+
+    .user-avatar {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        margin-left: 10px;
+        order: 2;
+    }
+
+    .bot-avatar {
+        background: linear-gradient(135deg, #48bb78, #38a169);
+        color: white;
+        margin-right: 10px;
+    }
+
+    .message-content {
+        max-width: 70%;
+        position: relative;
+    }
+
+    .message-text {
+        padding: 12px 18px;
+        border-radius: 18px;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+        line-height: 1.5;
+        position: relative;
+    }
+
+    .user .message-text {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border-bottom-right-radius: 5px;
+        /* For user messages, if you want them left-aligned too, add text-align: left; here */
+    }
+
+    .bot .message-text {
+        background: rgba(255, 255, 255, 0.9);
+        color: #2d3748;
+        border: 1px solid #e2e8f0;
+        border-bottom-left-radius: 5px;
+        text-align: left; /* Add this line */
+    }
+
+    .message-time {
+        font-size: 0.75rem;
+        color: #a0aec0;
+        margin-top: 5px;
+        text-align: right;
+    }
+
+    .user .message-time {
+        text-align: right;
+    }
+
+    .bot .message-time {
+        text-align: left;
+    }
+
+    .welcome-message {
+        display: flex;
+        justify-content: flex-start;
+        margin-bottom: 20px;
+    }
+
+    .welcome-message .message-text {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        border: 2px solid rgba(102, 126, 234, 0.2);
+        color: #667eea;
+        font-weight: 500;
+        text-align: left; /* Ensure welcome message text is also left-aligned */
+    }
+
+    .chat-controls {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .clear-button, .history-button {
+        padding: 8px 16px;
+        border: 2px solid #e2e8f0;
+        background: rgba(255, 255, 255, 0.8);
+        color: #667eea;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+
+    .clear-button:hover, .history-button:hover {
+        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .typing-indicator {
+        display: flex;
+        align-items: center;
+        padding: 12px 18px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        border-bottom-left-radius: 5px;
+        color: #667eea;
+        font-style: italic;
+        text-align: left; /* Ensure typing indicator text is left-aligned */
+    }
+
+    .typing-dots {
+        display: inline-flex;
+        margin-left: 5px;
+    }
+
+    .typing-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #667eea;
+        margin: 0 1px;
+        animation: typingDot 1.4s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes fadeInMessage {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes typingDot {
+        0%, 80%, 100% {
+            transform: scale(0.8);
+            opacity: 0.5;
+        }
+        40% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #e2e8f0;
+        border-radius: 50%;
+        border-top-color: #667eea;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 10px;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .feature-badges {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+
+    .badge {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        color: #667eea;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        border: 1px solid rgba(102, 126, 234, 0.2);
+    }
+
+    /* Custom scrollbar styles */
+    .chat-history::-webkit-scrollbar {
+        width: 6px;
+    }
+    .chat-history::-webkit-scrollbar-track {
+        background: rgba(0,0,0,0.1);
+        border-radius: 3px;
+    }
+    .chat-history::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 3px;
+    }
+    .chat-history::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #5a67d8, #6b46c1);
+    }
+
+    /* Notification animations */
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        to { transform: translateX(100%); opacity: 0; }
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .container {
+            padding: 25px;
+            margin: 10px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 25px;
+        }
+
+        .input-container {
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #askButton {
+            width: 100%;
+        }
+
+        #questionInput, #askButton {
+            padding: 15px 18px;
+        }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>🤖 AI Q&A Assistant</h1>
+    <div class="input-container">
+        <input type="text" id="questionInput" placeholder="请输入您的问题..." maxlength="500">
+        <button id="askButton">
+            <span id="buttonText">提问</span>
+        </button>
+    </div>
+    <div class="chat-container">
+        <div id="chatHistory" class="chat-history">
+            <div class="welcome-message">
+                <div class="avatar bot-avatar">🤖</div>
+                <div class="message-content">
+                    <div class="message-text">👋 欢迎使用 AI 助手！我支持多轮对话，可以记住我们之前的交流内容。请输入您的问题吧！</div>
+                    <div class="message-time">刚刚</div>
+                </div>
+            </div>
+        </div>
+        <div class="chat-controls">
+            <button id="clearBtn" class="clear-button">🗑️ 清空对话</button>
+            <button id="historyBtn" class="history-button">📝 展开历史</button>
+        </div>
+    </div>
+    <div class="feature-badges">
+        <span class="badge">🚀 智能问答</span>
+        <span class="badge">⚡ 快速响应</span>
+        <span class="badge">🎯 精准回答</span>
+    </div>
+</div>
+
+<script>
+    // Get DOM elements
+    const questionInput = document.getElementById('questionInput');
+    const askButton = document.getElementById('askButton');
+    const buttonText = document.getElementById('buttonText');
+    const chatHistory = document.getElementById('chatHistory');
+    const clearBtn = document.getElementById('clearBtn');
+    const historyBtn = document.getElementById('historyBtn');
+
+    let conversationCount = 0;
+    let isTyping = false;
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        questionInput.focus();
+        
+        setTimeout(() => {
+            if (!questionInput.value) {
+                questionInput.placeholder = '例如：什么是人工智能？';
+            }
+        }, 3000);
+    });
+
+    // Event listeners
+    questionInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !askButton.disabled && !isTyping) {
+            askQuestion();
+        }
+    });
+
+    questionInput.addEventListener('input', () => {
+        const length = questionInput.value.length;
+        questionInput.style.borderColor = length > 450 ? '#f56565' : '#e2e8f0';
+    });
+
+    askButton.addEventListener('click', askQuestion);
+    clearBtn.addEventListener('click', clearConversation);
+    historyBtn.addEventListener('click', toggleHistoryView);
+
+    // Main functions
+    async function askQuestion() {
+        const question = questionInput.value.trim();
+        if (!question) {
+            showNotification('请输入问题再提交', 'warning');
+            questionInput.focus();
+            return;
+        }
+
+        // Add user message to chat
+        addMessageToChat('user', question);
+        
+        // Clear input
+        questionInput.value = '';
+        
+        // Show typing indicator
+        showTypingIndicator();
+        setLoadingState(true);
+
+        try {
+            // Call Flask API
+            const response = await fetch('/ask', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    question: question
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            // Remove typing indicator
+            removeTypingIndicator();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // Add bot reply
+            addMessageToChat('bot', data.answer);
+            
+            // Update conversation count
+            conversationCount = data.conversation_count || conversationCount + 1;
+            
+            showNotification(`第 ${conversationCount} 轮对话完成`, 'success');
+
+        } catch (error) {
+            console.error('API调用错误:', error);
+            removeTypingIndicator();
+            
+            let errorMessage = '抱歉，服务暂时不可用，请稍后重试。';
+            
+            // Handle specific error types
+            if (error.message.includes('Failed to fetch')) {
+                errorMessage = '无法连接到服务器，请检查网络连接。';
+            } else if (error.message.includes('HTTP error')) {
+                errorMessage = '服务器响应错误，请稍后重试。';
+            } else if (error.message.includes('API')) {
+                errorMessage = error.message;
+            }
+            
+            addMessageToChat('bot', errorMessage, true);
+            showNotification('请求失败，请重试', 'error');
+        } finally {
+            setLoadingState(false);
+            scrollToBottom();
+        }
+    }
+
+    function addMessageToChat(type, text, isError = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${type}`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = `avatar ${type}-avatar`;
+        avatar.textContent = type === 'user' ? '👤' : '🤖';
+        
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        
+        const messageText = document.createElement('div');
+        messageText.className = 'message-text';
+        if (isError) {
+            messageText.style.background = 'rgba(254, 242, 242, 0.9)';
+            messageText.style.color = '#c53030';
+            messageText.style.borderColor = '#f56565';
+        }
+        
+        const messageTime = document.createElement('div');
+        messageTime.className = 'message-time';
+        messageTime.textContent = new Date().toLocaleTimeString('zh-CN', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        messageContent.appendChild(messageText);
+        messageContent.appendChild(messageTime);
+        messageDiv.appendChild(avatar); // Avatar first
+        messageDiv.appendChild(messageContent); // Then content
+        
+        chatHistory.appendChild(messageDiv);
+        
+        // Typewriter effect for bot replies
+        if (type === 'bot' && !isError) {
+            typeWriter(messageText, text, 20);
+        } else {
+            messageText.textContent = text;
+        }
+        
+        scrollToBottom();
+    }
+
+    function showTypingIndicator() {
+        if (isTyping) return;
+        
+        isTyping = true;
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'chat-message bot';
+        typingDiv.id = 'typing-indicator';
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar bot-avatar';
+        avatar.textContent = '🤖';
+        
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        
+        const typingIndicatorElement = document.createElement('div'); // Renamed to avoid conflict
+        typingIndicatorElement.className = 'typing-indicator';
+        typingIndicatorElement.innerHTML = `
+            正在思考
+            <span class="typing-dots">
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+            </span>
+        `;
+        
+        messageContent.appendChild(typingIndicatorElement);
+        typingDiv.appendChild(avatar);
+        typingDiv.appendChild(messageContent);
+        
+        chatHistory.appendChild(typingDiv);
+        scrollToBottom();
+    }
+
+    function removeTypingIndicator() {
+        const typingIndicator = document.getElementById('typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+        isTyping = false;
+    }
+
+    function setLoadingState(isLoading) {
+        askButton.disabled = isLoading;
+        questionInput.disabled = isLoading;
+        
+        if (isLoading) {
+            buttonText.innerHTML = '<span class="loading-spinner"></span>处理中...';
+        } else {
+            buttonText.textContent = '提问';
+        }
+    }
+
+    function typeWriter(element, text, speed = 30) {
+        element.textContent = '';
+        let i = 0;
+        
+        function type() {
+            if (i < text.length) {
+                element.textContent += text.charAt(i);
+                i++;
+                setTimeout(type, speed);
+            } else {
+                scrollToBottom(); // Ensure scroll after typing finishes
+            }
+        }
+        
+        type();
+    }
+
+    function scrollToBottom() {
+        setTimeout(() => {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }, 100); // Small delay to allow DOM update
+    }
+
+    async function clearConversation() {
+        // Check if there's anything to clear beyond the welcome message
+        const actualMessages = Array.from(chatHistory.children).filter(child => !child.classList.contains('welcome-message'));
+        if (actualMessages.length === 0 && conversationCount === 0) {
+            showNotification('当前没有对话历史', 'info');
+            return;
+        }
+
+        if (!confirm('确定要清空所有对话记录吗？')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Conversation cleared on server:', data);
+            } else {
+                console.error('Failed to clear conversation on server');
+                showNotification('清空对话失败，请稍后重试', 'error');
+            }
+        } catch (error) {
+            console.error('Error clearing conversation:', error);
+            showNotification('清空对话时发生网络错误', 'error');
+        }
+
+        // Clear chat history display
+        chatHistory.innerHTML = `
+            <div class="welcome-message">
+                <div class="avatar bot-avatar">🤖</div>
+                <div class="message-content">
+                    <div class="message-text">👋 对话已清空！我支持多轮对话，可以记住我们之前的交流内容。请输入您的问题吧！</div>
+                    <div class="message-time">刚刚</div>
+                </div>
+            </div>
+        `;
+        
+        conversationCount = 0;
+        showNotification('对话历史已清空', 'success');
+    }
+
+    function toggleHistoryView() {
+        const historyHeight = chatHistory.style.maxHeight;
+        if (historyHeight === '600px' || chatHistory.style.maxHeight === '') { // Default might be empty
+            chatHistory.style.maxHeight = '400px'; // Default chat history height
+            historyBtn.textContent = '📝 展开历史';
+        } else {
+            chatHistory.style.maxHeight = '600px';
+            historyBtn.textContent = '📝 收起历史';
+            scrollToBottom();
+        }
+    }
+
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        const colors = {
+            success: { bg: '#c6f6d5', color: '#22543d', border: '#48bb78' },
+            error: { bg: '#fed7d7', color: '#c53030', border: '#f56565' },
+            warning: { bg: '#faf089', color: '#744210', border: '#ecc94b' },
+            info: { bg: '#bee3f8', color: '#2a4365', border: '#4299e1' }
+        };
+        
+        const style = colors[type] || colors.info;
+        
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: ${style.bg};
+            color: ${style.color};
+            border: 2px solid ${style.border};
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1000;
+            font-weight: 500;
+            max-width: 300px;
+            animation: slideIn 0.3s ease;
+        `;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease forwards';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            if (!askButton.disabled && !isTyping) {
+                askQuestion();
+            }
+        }
+        
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            clearConversation();
+        }
+        
+        if (e.key === 'Escape') {
+            if (document.activeElement === questionInput) {
+                questionInput.blur();
+            } else {
+                questionInput.focus();
+            }
+        }
+    });
+</script>
+</body>
+</html>
